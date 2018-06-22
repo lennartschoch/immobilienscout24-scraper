@@ -27,6 +27,11 @@ const scrapApartment = url => new Promise((resolve, reject) => {
         const apartment = apartmentScraper.scrap(body);
         apartment.url = url;
 
+        // Because the expose ID is always the last part of the URL, we wanna get it from there
+
+        const urlFragments = apartment.url.split('/');
+        apartment.id = urlFragments[urlFragments.length - 1]
+
         resolve(apartment);
     });
 });

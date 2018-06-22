@@ -14,19 +14,17 @@ const parsePrice = (text) => {
 const scrapAddress = (addressBlock) => {
     const result = {};
 
-    const splittedAddressBlock = addressBlock.split(',');
-    if (splittedAddressBlock.length === 3) {
-        const addressRegex = /(\d{5}) (\S+)/.exec(splittedAddressBlock[1]);
+    // Structure of address changed
 
-        result.address = splittedAddressBlock[0];
-        result.postalCode = addressRegex ? addressRegex[1] : null;
-        result.city = addressRegex ? addressRegex[2] : null;
-    } else if (splittedAddressBlock.length === 1) {
-        const addressRegex = /(\d{5}) (\S+)/.exec(splittedAddressBlock[0]);
-
-        result.postalCode = addressRegex ? addressRegex[1] : null;
-        result.city = addressRegex ? addressRegex[2] : null;
+    if (addressBlock.children().length === 2) {
+        result.address = addressBlock.children().first().text().split(',')[0].trim();
     }
+
+    const zipAndCity = addressBlock.find('.zip-region-and-country').text().split(',')[0];
+    const addressRegex = /(\d{5}) (\S+)/.exec(zipAndCity);
+
+    result.postalCode = addressRegex ? addressRegex[1] : null;
+    result.city = addressRegex ? addressRegex[2] : null;
 
     return result;
 };
@@ -40,15 +38,17 @@ const scrapImages = (sliderBlock) => {
 
 const parseAvailableFrom = (text) => {
     if (text) {
-        const dateRegex = /^\D+(\d{1,2}\.\d{1,2}\.\d{4})\s*$/.exec(text);
+        // Date format changed
+        const dateRegex = /^\D+(\d{1,2}\.\d{1,2}\.\d{2})\s*$/.exec(text);
         if (dateRegex) {
-            const dateStr = dateRegex[1].split('.').reverse().join('-');
+            const dateStr = '20'+dateRegex[1].split('.').reverse().join('-');
             const date = new Date(dateStr);
             return {
                 availableFrom: date,
                 isAvailable: date.getTime() < (new Date()).getTime(),
             };
-        } else if (text.trim() === 'sofort') {
+        // Available apartments might also say 'Ab sofort', so I've replaced the 'trim' function by an 'indexOf'
+        } else if (text.indexOf('sofort') !== -1) {
             return {
                 availableFrom: null,
                 isAvailable: true,
@@ -69,19 +69,21 @@ exports.scrap = (page) => {
 
     let apartment = {};
 
-    apartment.id = $('[name="exposeId"]').val();
     apartment.rentBase = parsePrice($('.is24qa-kaltmiete').text());
     apartment.rentTotal = parsePrice($('.is24qa-gesamtmiete').text());
     apartment.area = parseArea($('.is24qa-wohnflaeche-ca').text().replace(',', '.'));
     apartment.rooms = parseInt($('.is24qa-zi').text(), 10);
-    apartment.images = scrapImages($('#slideImageContainer'));
+    // ID changed
+    apartment.images = scrapImages($('#fullscreenSlider'));
 
     const availability = parseAvailableFrom($('.is24qa-bezugsfrei-ab').text());
     apartment = Object.assign(apartment, availability);
 
-    const addressBlock = $('h4 .address-block [data-ng-non-bindable]');
+    // Address block is not an h4 anymore. Also, only get the first occurence of the element
+    const addressBlock = $('.address-block [data-ng-non-bindable]').first();
     if (addressBlock && addressBlock.text().trim()) {
-        const addressInfo = scrapAddress(addressBlock.text().trim());
+        // Use address as element to make parsing easier.
+        const addressInfo = scrapAddress(addressBlock);
         apartment = Object.assign(apartment, addressInfo);
     }
 
